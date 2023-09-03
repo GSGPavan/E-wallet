@@ -96,10 +96,10 @@ public class WalletService {
             String externalId = jsonObject.getString("externalId");
             Wallet senderWallet = walletRepository.findWalletByPhoneNumber(senderId);
             Wallet receiverWallet= walletRepository.findWalletByPhoneNumber(receiverId);
-//            if(senderWallet==null || receiverWallet == null)
-//            {
-//                throw new Exception("Sender or Receiver does not exist in system");
-//            }
+            if(senderWallet==null || receiverWallet == null)
+            {
+                throw new Exception("Sender or Receiver does not exist in system");
+            }
             if(senderWallet.getBalance()<amount)
             {
                 throw new Exception("Insufficient balance");
