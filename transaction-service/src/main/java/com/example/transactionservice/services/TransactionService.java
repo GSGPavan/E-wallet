@@ -44,17 +44,17 @@ public class TransactionService {
 
     private void sendCreatedTransactionToTopic(Transaction dbTransaction) throws JsonProcessingException {
         JSONObject jsonObject = new JSONObject();
-        jsonObject.append("senderId",dbTransaction.getSenderId());
-        jsonObject.append("receiverId", dbTransaction.getReceiverId());
-        jsonObject.append("amount",dbTransaction.getAmount());
-        jsonObject.append("externalId",dbTransaction.getExternalId());
-        kafkaTemplate.send(Constant.TRANSACTION_CREATED_TOPIC,objectMapper.writeValueAsString(jsonObject));
+        jsonObject.accumulate("senderId",dbTransaction.getSenderId());
+        jsonObject.accumulate("receiverId", dbTransaction.getReceiverId());
+        jsonObject.accumulate("amount",dbTransaction.getAmount());
+        jsonObject.accumulate("externalId",dbTransaction.getExternalId());
+        kafkaTemplate.send(Constant.TRANSACTION_CREATED_TOPIC,jsonObject.toString());
     }
 
-    @KafkaListener(topics = {Constant.WALLET_UPDATED_TOPIC})
-    public void updateTransaction(String msg){
-
-    }
+//    @KafkaListener(topics = {Constant.WALLET_UPDATED_TOPIC},groupId = "walletUpdatedConsumerGroup")
+//    public void updateTransaction(String msg){
+//
+//    }
 
     public String getKeyForTransaction(String externalId){
         return Constant.REDIS_TRANSACTION_KEY_DELIMITER+externalId;
