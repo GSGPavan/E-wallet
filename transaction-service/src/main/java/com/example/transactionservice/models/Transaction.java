@@ -31,7 +31,7 @@ public class Transaction {
     @Column(nullable = false)
     private String receiverId; //receiver phone number
 
-    @Enumerated(value = EnumType.ORDINAL)
+    @Enumerated(value = EnumType.STRING)
     private TransactionStatus status;
 
     private String reason;

@@ -42,7 +42,11 @@ public class WalletService {
                         .balance(Constant.WALLET_INITIAL_BALANCE).build();
                 Wallet dbWallet = walletRepository.save(wallet);
                 walletCacheRepository.save(getKeyForWallet(dbWallet.getId()),dbWallet);
-                kafkaTemplate.send(Constant.WALLET_CREATED_TOPIC,objectMapper.writeValueAsString(dbWallet));
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.accumulate("email",user.getEmail());
+                jsonObject.accumulate("phoneNumber",user.getPhoneNumber());
+                jsonObject.accumulate("amount",dbWallet.getBalance());
+                kafkaTemplate.send(Constant.WALLET_CREATED_TOPIC,jsonObject.toString());
             }
         }
     }
@@ -84,7 +88,7 @@ public class WalletService {
         throw new Exception("At least one parameter should be given");
     }
 
-    @Transactional(rollbackOn = {Exception.class})
+    @Transactional(rollbackOn = {Exception.class, RuntimeException.class, Throwable.class})
     @KafkaListener(topics = {Constant.TRANSACTION_CREATED_TOPIC},groupId = "transactionCreatedConsumerGroup")
     public void updateWallet(String msg) throws Exception {
         JSONObject jsonObject = objectMapper.convertValue(msg,JSONObject.class);
@@ -92,36 +96,51 @@ public class WalletService {
         {
             String senderId = jsonObject.getString("senderId");
             String receiverId = jsonObject.getString("receiverId");
-            long amount = ((Integer)jsonObject.get("amount")).longValue();
+            long amount = jsonObject.getLong("amount");
             String externalId = jsonObject.getString("externalId");
+            JSONObject jsonObject1 = new JSONObject();
+            jsonObject1.accumulate("externalId",externalId);
+            jsonObject1.accumulate("senderId", senderId);
+            jsonObject1.accumulate("receiverId", receiverId);
+            jsonObject1.accumulate("amount", amount);
             Wallet senderWallet = walletRepository.findWalletByPhoneNumber(senderId);
             Wallet receiverWallet= walletRepository.findWalletByPhoneNumber(receiverId);
             if(senderWallet==null || receiverWallet == null)
             {
+                jsonObject1.accumulate("walletUpdate", WalletUpdate.FAILED);
+                kafkaTemplate.send(Constant.WALLET_UPDATED_TOPIC,jsonObject1.toString());
                 throw new Exception("Sender or Receiver does not exist in system");
             }
             if(senderWallet.getBalance()<amount)
             {
+                jsonObject1.accumulate("walletUpdate", WalletUpdate.FAILED);
+                kafkaTemplate.send(Constant.WALLET_UPDATED_TOPIC,jsonObject1.toString());
                 throw new Exception("Insufficient balance");
             }
             int senderCount = walletRepository.updateAmount(senderId,-amount);
             int receiverCount = walletRepository.updateAmount(receiverId,amount);
-            JSONObject jsonObject1 = new JSONObject();
-            jsonObject1.accumulate("externalId",externalId);
             if(senderCount != 1 || receiverCount != 1)
             {
                 jsonObject1.accumulate("walletUpdate", WalletUpdate.FAILED);
-                kafkaTemplate.send(Constant.WALLET_UPDATED_TOPIC,objectMapper.writeValueAsString(jsonObject1));
-                throw new Exception("Receiver does not exist in the system");
+                kafkaTemplate.send(Constant.WALLET_UPDATED_TOPIC,jsonObject1.toString());
+                throw new Exception("sender or receiver does not exist");
             }
             else
             {
                 walletCacheRepository.save(getKeyForWallet(senderWallet.getId()),senderWallet);
                 walletCacheRepository.save(getKeyForWallet(receiverWallet.getId()),receiverWallet);
                 jsonObject1.accumulate("walletUpdate", WalletUpdate.SUCCESS);
-                kafkaTemplate.send(Constant.WALLET_UPDATED_TOPIC,objectMapper.writeValueAsString(jsonObject1));
+                kafkaTemplate.send(Constant.WALLET_UPDATED_TOPIC,jsonObject1.toString());
             }
         }
     }
 
+    @Transactional(rollbackOn = {Exception.class,Throwable.class, RuntimeException.class})
+    public boolean addMoneyToWallet(String phoneNumber, Long amount) throws Exception {
+        if(phoneNumber!=null && amount!=null && amount!=0L)
+        {
+            return walletRepository.updateAmount(phoneNumber,amount) == 1;
+        }
+        throw new Exception("phoneNumber and amount cannot be null");
+    }
 }

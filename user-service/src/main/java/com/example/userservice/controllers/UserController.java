@@ -17,18 +17,18 @@ public class UserController {
     UserService userService;
 
     @PostMapping("/createUser")
-    public void createUser(@RequestBody @Valid  CreateUserRequest createUserRequest) throws JsonProcessingException {
-        userService.createUser(createUserRequest.toUser());
+    public User createUser(@RequestBody @Valid  CreateUserRequest createUserRequest) throws Exception {
+        return userService.createUser(createUserRequest.toUser());
     }
 
     @PostMapping("/updateUser")
-    public void updateUser(@RequestBody @Valid UpdateUserRequest updateUserRequest) throws JsonProcessingException {
-        userService.updateUser(updateUserRequest.toUser());
+    public User updateUser(@RequestBody @Valid UpdateUserRequest updateUserRequest) throws Exception {
+        return userService.updateUser(updateUserRequest.toUser());
     }
 
-    @GetMapping("/getUserDetails/id")
-    public User getUserDetails(@RequestParam Integer id) throws Exception {
-        return userService.getUserDetails(id);
+    @GetMapping("/getUserDetails")
+    public User getUserDetails(@RequestParam(required = false) Integer id, @RequestParam(required = false) String phoneNumber) throws Exception {
+        return userService.getUserDetails(id,phoneNumber);
     }
 
 }

@@ -27,13 +27,15 @@ public class UserService {
     @Autowired
     KafkaTemplate<String,String> kafkaTemplate;
 
-    public void createUser(User user) throws JsonProcessingException {
+    public User createUser(User user) throws Exception {
         User DBUser;
         if(user!=null) {
             DBUser = userRepository.save(user);
             userCacheRepository.set(getKeyForUser(DBUser), objectMapper.writeValueAsString(DBUser));
             kafkaTemplate.send(Constant.USER_CREATED_TOPIC,objectMapper.writeValueAsString(DBUser));
+            return DBUser;
         }
+        throw new Exception("User cannot be null");
     }
 
     public String getKeyForUser(User user)
@@ -46,26 +48,38 @@ public class UserService {
         return STRING_DELIMITER+id;
     }
 
-    public User getUserDetails(Integer id) throws Exception {
-        User cacheUser = objectMapper.readValue(userCacheRepository.get(getKeyForUser(id)), User.class);
-        User DBUser = cacheUser;
-        if(cacheUser == null) {
-            DBUser = userRepository.findById(id).orElse(null);
-            if (DBUser != null) {
-                userCacheRepository.set(getKeyForUser(DBUser), objectMapper.writeValueAsString(DBUser));
-            } else throw new Exception("No user present with the given userid");
+    public User getUserDetails(Integer id, String phoneNumber) throws Exception {
+        User DBUser;
+        if(id!=null) {
+            User cacheUser = objectMapper.readValue(userCacheRepository.get(getKeyForUser(id)), User.class);
+            DBUser = cacheUser;
+            if (cacheUser == null) {
+                DBUser = userRepository.findById(id).orElse(null);
+                if (DBUser != null) {
+                    userCacheRepository.set(getKeyForUser(DBUser), objectMapper.writeValueAsString(DBUser));
+                } else throw new Exception("No user present with the given userid");
+            }
+            return DBUser;
         }
-        return DBUser;
+        DBUser = userRepository.findByPhoneNumber(phoneNumber);
+        if(DBUser!=null)
+        {
+            return DBUser;
+        }
+        throw new Exception("No user present with the given phoneNumber");
     }
 
-    public void updateUser(User user) throws JsonProcessingException {
+    public User  updateUser(User user) throws Exception {
+        User DBUser;
         if(user != null) {
             User savedUser = userRepository.findByPhoneNumber(user.getPhoneNumber());
             savedUser.setAge(user.getAge());
             savedUser.setName(user.getName());
             savedUser.setEmail(user.getEmail());
-            userRepository.save(savedUser);
-            userCacheRepository.set(getKeyForUser(savedUser), objectMapper.writeValueAsString(savedUser));
+            DBUser = userRepository.save(savedUser);
+            userCacheRepository.set(getKeyForUser(savedUser), objectMapper.writeValueAsString(DBUser));
+            return DBUser;
         }
+        throw new Exception("User cannot be null");
     }
 }
